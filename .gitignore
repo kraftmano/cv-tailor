@@ -1,0 +1,23 @@
+# Generated output CVs (personal docs, not tracked)
+output/*.docx
+output/*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+~$*
+
+# Streamlit
+.streamlit/secrets.toml
+
+# API keys
+*.key
+.env*
