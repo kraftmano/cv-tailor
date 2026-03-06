@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}CV Tailor — Setup{% endblock %}
+
+{% block content %}
+
+<!-- Step progress -->
+<div class="d-flex align-items-center mb-4 px-1">
+  <div class="step-item active">
+    <span class="step-dot">1</span>
+    <span>Setup</span>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item">
+    <span class="step-dot">2</span>
+    <span>Tailor to a Job</span>
+  </div>
+</div>
+
+<!-- Main form (shown until job starts) -->
+<div id="setup-form-section">
+  <form id="setup-form" enctype="multipart/form-data">
+
+    <!-- Card 1: Upload CVs -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i class="bi bi-upload me-2 text-primary"></i>Upload Your CV Files
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-3" style="font-size: 0.9rem;">
+          Upload one or more versions of your CV in <strong>.docx</strong> format.
+          You can upload multiple drafts or versions — the system will use all of them to build optimised CVs for each role you specify.
+        </p>
+
+        <div class="file-drop-zone" id="drop-zone" onclick="document.getElementById('cv_files').click()">
+          <input type="file" id="cv_files" name="cv_files" multiple accept=".docx">
+          <i class="bi bi-cloud-arrow-up fs-2 text-muted mb-2 d-block"></i>
+          <div class="fw-semibold mb-1">Click to upload or drag & drop</div>
+          <div class="text-muted small">.docx files only</div>
+        </div>
+
+        <div id="file-list" class="mt-3"></div>
+      </div>
+    </div>
+
+    <!-- Card 2: Role Types -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i class="bi bi-briefcase me-2 text-primary"></i>Target Role Types
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-3" style="font-size: 0.9rem;">
+          Enter the types of roles you want to create tailored CVs for.
+          The system will generate one optimised CV version per role type.
+        </p>
+
+        <div id="role-inputs">
+          <div class="input-group mb-2 role-row">
+            <span class="input-group-text bg-light border-end-0">
+              <i class="bi bi-briefcase-fill text-muted"></i>
+            </span>
+            <input type="text" class="form-control border-start-0" name="role_types"
+                   placeholder="e.g. Product Manager">
+            <button type="button" class="btn btn-outline-secondary remove-role" title="Remove">
+              <i class="bi bi-x"></i>
+            </button>
+          </div>
+          <div class="input-group mb-2 role-row">
+            <span class="input-group-text bg-light border-end-0">
+              <i class="bi bi-briefcase-fill text-muted"></i>
+            </span>
+            <input type="text" class="form-control border-start-0" name="role_types"
+                   placeholder="e.g. Growth Lead">
+            <button type="button" class="btn btn-outline-secondary remove-role" title="Remove">
+              <i class="bi bi-x"></i>
+            </button>
+          </div>
+          <div class="input-group mb-2 role-row">
+            <span class="input-group-text bg-light border-end-0">
+              <i class="bi bi-briefcase-fill text-muted"></i>
+            </span>
+            <input type="text" class="form-control border-start-0" name="role_types"
+                   placeholder="e.g. Consulting">
+            <button type="button" class="btn btn-outline-secondary remove-role" title="Remove">
+              <i class="bi bi-x"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" id="add-role-btn" class="btn btn-sm btn-outline-primary mt-1">
+          <i class="bi bi-plus-circle me-1"></i>Add another role
+        </button>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="d-grid">
+      <button type="submit" class="btn btn-primary btn-lg" id="generate-btn">
+        <i class="bi bi-stars me-2"></i>Generate My CVs
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<!-- Processing section (hidden until job starts) -->
+<div id="processing-section" class="d-none">
+
+  <div class="card mb-4" id="spinner-card">
+    <div class="card-body text-center py-5">
+      <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+      <h5 class="mb-2">Generating your role CVs...</h5>
+      <p class="text-muted mb-0">
+        Claude is reading your CVs and optimising them for each role type.<br>
+        This usually takes 30–60 seconds per role.
+      </p>
+      <div id="generation-progress" class="mt-3 text-muted small"></div>
+    </div>
+  </div>
+
+  <div class="card border-danger d-none" id="error-card">
+    <div class="card-body text-center py-4">
+      <i class="bi bi-exclamation-circle-fill text-danger fs-2 mb-2 d-block"></i>
+      <h6 class="text-danger mb-2">Something went wrong</h6>
+      <p class="text-muted small mb-3" id="error-message"></p>
+      <button class="btn btn-outline-danger btn-sm" onclick="resetToForm()">Try Again</button>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ---- File upload handling ----
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('cv_files');
+  const fileList = document.getElementById('file-list');
+
+  fileInput.addEventListener('change', renderFileList);
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    fileInput.files = e.dataTransfer.files;
+    renderFileList();
+  });
+
+  function renderFileList() {
+    const files = Array.from(fileInput.files);
+    if (files.length === 0) { fileList.innerHTML = ''; return; }
+    fileList.innerHTML = files.map(f =>
+      `<div class="d-flex align-items-center gap-2 py-1">
+         <i class="bi bi-file-earmark-word text-primary"></i>
+         <span class="small">${escHtml(f.name)}</span>
+       </div>`
+    ).join('');
+  }
+
+  // ---- Role type inputs ----
+  document.getElementById('add-role-btn').addEventListener('click', () => {
+    const row = document.createElement('div');
+    row.className = 'input-group mb-2 role-row';
+    row.innerHTML = `
+      <span class="input-group-text bg-light border-end-0">
+        <i class="bi bi-briefcase-fill text-muted"></i>
+      </span>
+      <input type="text" class="form-control border-start-0" name="role_types"
+             placeholder="e.g. Chief of Staff">
+      <button type="button" class="btn btn-outline-secondary remove-role" title="Remove">
+        <i class="bi bi-x"></i>
+      </button>`;
+    document.getElementById('role-inputs').appendChild(row);
+    row.querySelector('input').focus();
+  });
+
+  document.getElementById('role-inputs').addEventListener('click', e => {
+    const btn = e.target.closest('.remove-role');
+    if (!btn) return;
+    const rows = document.querySelectorAll('.role-row');
+    if (rows.length > 1) btn.closest('.role-row').remove();
+  });
+
+  // ---- Form submission ----
+  document.getElementById('setup-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('generate-btn');
+
+    // Validate
+    const files = Array.from(fileInput.files).filter(f => f.name.endsWith('.docx'));
+    const roles = Array.from(document.querySelectorAll('input[name="role_types"]'))
+                       .map(i => i.value.trim()).filter(Boolean);
+
+    if (files.length === 0) { showAlert('Please upload at least one .docx file.'); return; }
+    if (roles.length === 0) { showAlert('Please enter at least one role type.'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Uploading...';
+
+    const formData = new FormData(this);
+    let resp, data;
+    try {
+      resp = await fetch('/setup', { method: 'POST', body: formData });
+      data = await resp.json();
+    } catch {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-stars me-2"></i>Generate My CVs';
+      showAlert('Upload failed. Please try again.');
+      return;
+    }
+
+    if (!resp.ok || data.error) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-stars me-2"></i>Generate My CVs';
+      showAlert(data.error || 'Upload failed.');
+      return;
+    }
+
+    // Show processing UI
+    document.getElementById('setup-form-section').classList.add('d-none');
+    document.getElementById('processing-section').classList.remove('d-none');
+
+    const jobId = data.job_id;
+    const roleCount = roles.length;
+    document.getElementById('generation-progress').textContent =
+      `Generating ${roleCount} role CV${roleCount > 1 ? 's' : ''}...`;
+
+    // Poll
+    const poll = setInterval(async () => {
+      try {
+        const sr = await fetch(`/setup-status/${jobId}`);
+        const sdata = await sr.json();
+
+        if (sdata.status === 'done') {
+          clearInterval(poll);
+          window.location.href = '/tailor';
+        } else if (sdata.status === 'error') {
+          clearInterval(poll);
+          showProcessingError(sdata.error || 'An error occurred during generation.');
+        }
+      } catch { /* keep polling */ }
+    }, 2500);
+  });
+
+  function showProcessingError(msg) {
+    document.getElementById('spinner-card').classList.add('d-none');
+    document.getElementById('error-message').textContent = msg;
+    document.getElementById('error-card').classList.remove('d-none');
+  }
+
+  function resetToForm() {
+    document.getElementById('processing-section').classList.add('d-none');
+    document.getElementById('spinner-card').classList.remove('d-none');
+    document.getElementById('error-card').classList.add('d-none');
+    document.getElementById('setup-form-section').classList.remove('d-none');
+    document.getElementById('generate-btn').disabled = false;
+    document.getElementById('generate-btn').innerHTML = '<i class="bi bi-stars me-2"></i>Generate My CVs';
+  }
+
+  function showAlert(msg) {
+    const div = document.createElement('div');
+    div.className = 'alert alert-danger alert-dismissible fade show mb-4';
+    div.innerHTML = msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    document.querySelector('main').prepend(div);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CV Tailor{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f4f6f9;
+      color: #1a1a2e;
+    }
+    .navbar-brand {
+      font-size: 1.25rem;
+      letter-spacing: -0.01em;
+    }
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+    }
+    .card-header {
+      background: transparent;
+      border-bottom: 1px solid rgba(0,0,0,.06);
+      font-weight: 600;
+      padding: 1.1rem 1.5rem 0.9rem;
+    }
+    .card-body {
+      padding: 1.5rem;
+    }
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+    .step-item.active {
+      color: #0d6efd;
+      font-weight: 600;
+    }
+    .step-item.active .step-dot {
+      background: #0d6efd;
+    }
+    .step-dot {
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      background: #dee2e6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .step-connector {
+      flex: 1;
+      height: 2px;
+      background: #dee2e6;
+      margin: 0 0.5rem;
+    }
+    .btn-primary {
+      padding: 0.55rem 1.5rem;
+    }
+    .file-drop-zone {
+      border: 2px dashed #cbd3da;
+      border-radius: 10px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .file-drop-zone:hover,
+    .file-drop-zone.dragover {
+      border-color: #0d6efd;
+      background: #f0f5ff;
+    }
+    .file-drop-zone input[type="file"] {
+      display: none;
+    }
+    .role-cv-card {
+      border: 2px solid #dee2e6;
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 0.75rem;
+    }
+    .role-cv-card:hover {
+      border-color: #0d6efd;
+      background: #f8f9ff;
+    }
+    .role-cv-card input[type="radio"]:checked ~ .role-cv-label {
+      color: #0d6efd;
+    }
+    .role-cv-card.selected {
+      border-color: #0d6efd;
+      background: #f0f5ff;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container" style="max-width: 800px;">
+      <a class="navbar-brand fw-semibold" href="/">
+        <i class="bi bi-file-earmark-person me-2"></i>CV Tailor
+      </a>
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        {% if current_user.is_authenticated %}
+          {# Reload credits from DB for accurate display #}
+          {% set _user_row = get_fresh_credits() %}
+          <span class="badge bg-secondary fs-6 fw-normal px-3 py-2">
+            <i class="bi bi-lightning-charge-fill text-warning me-1"></i>
+            {{ _user_row }} run{{ 's' if _user_row != 1 else '' }} left
+          </span>
+          <a href="/pricing" class="btn btn-sm btn-outline-light ms-1">Buy more</a>
+          <form method="post" action="/logout" class="ms-2">
+            <button type="submit" class="btn btn-sm btn-outline-secondary text-white border-secondary">
+              Sign out
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-5" style="max-width: 800px;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show mb-4" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

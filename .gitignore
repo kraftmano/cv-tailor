@@ -2,6 +2,10 @@
 output/*.docx
 output/*.pdf
 
+# Public app: session upload dirs (temp user files)
+uploads/*/
+!uploads/.gitkeep
+
 # Python
 __pycache__/
 *.py[cod]

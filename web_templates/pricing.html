@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}CV Tailor — Get Started{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+
+    {% if credits > 0 %}
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+      <i class="bi bi-check-circle-fill"></i>
+      <span>You have <strong>{{ credits }} run{{ 's' if credits != 1 else '' }}</strong> remaining. <a href="/" class="alert-link">Start tailoring →</a></span>
+    </div>
+    {% endif %}
+
+    <div class="text-center mb-4">
+      <h4 class="fw-bold mb-1">Get tailoring runs</h4>
+      <p class="text-muted">Each run tailors your CV to a specific job posting using Claude AI</p>
+    </div>
+
+    <!-- Pricing card -->
+    <div class="card mb-4" style="border: 2px solid #0d6efd;">
+      <div class="card-body p-4 text-center">
+        <div class="mb-3">
+          <span class="display-5 fw-bold">€{{ pack_price }}</span>
+        </div>
+        <h5 class="fw-semibold mb-3">{{ credits_per_pack }} CV tailoring runs</h5>
+
+        <ul class="list-unstyled text-start mb-4 mx-auto" style="max-width: 280px;">
+          <li class="mb-2">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Tailor your CV to <strong>{{ credits_per_pack }} different jobs</strong>
+          </li>
+          <li class="mb-2">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            AI rewrites up to 10 bullet points per run
+          </li>
+          <li class="mb-2">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Download as Word (.docx) — ready to edit
+          </li>
+          <li class="mb-2">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Runs never expire
+          </li>
+        </ul>
+
+        <form method="post" action="/checkout">
+          <button type="submit" class="btn btn-primary btn-lg px-5">
+            <i class="bi bi-credit-card me-2"></i>Pay €{{ pack_price }} with card
+          </button>
+        </form>
+
+        <p class="text-muted small mt-3 mb-0">
+          <i class="bi bi-lock-fill me-1"></i>Secure payment via Stripe. No card details stored.
+        </p>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-info-circle me-2 text-primary"></i>How it works
+      </div>
+      <div class="card-body">
+        <ol class="mb-0 small text-muted" style="line-height: 2;">
+          <li>Upload your existing CV(s) and choose your target role types</li>
+          <li>The AI generates a role-optimised CV for each role (free, unlimited)</li>
+          <li>Each time you tailor a CV to a <em>specific job posting</em> costs 1 run</li>
+          <li>Download your tailored CV as a Word file, ready to send</li>
+        </ol>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

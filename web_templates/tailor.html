@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block title %}CV Tailor — Tailor to a Job{% endblock %}
+
+{% block content %}
+
+<!-- Step progress -->
+<div class="d-flex align-items-center mb-4 px-1">
+  <div class="step-item">
+    <span class="step-dot" style="background:#28a745;">
+      <i class="bi bi-check" style="font-size:0.8rem;"></i>
+    </span>
+    <span class="text-muted">Setup</span>
+  </div>
+  <div class="step-connector" style="background:#28a745;"></div>
+  <div class="step-item active">
+    <span class="step-dot">2</span>
+    <span>Tailor to a Job</span>
+  </div>
+</div>
+
+<!-- Tailor form (hidden once job starts) -->
+<div id="tailor-form-section">
+  <form id="tailor-form" enctype="multipart/form-data">
+
+    <!-- Card 1: Select Role CV -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i class="bi bi-person-badge me-2 text-primary"></i>Select Your CV Version
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-3" style="font-size: 0.9rem;">
+          Choose which role-optimised CV you want to tailor for this specific job.
+        </p>
+        <div id="cv-selector">
+          {% for cv in role_cvs %}
+          <label class="role-cv-card d-flex align-items-center gap-3" style="cursor:pointer;">
+            <input type="radio" name="cv_index" value="{{ loop.index0 }}"
+                   {% if loop.first %}checked{% endif %}
+                   class="form-check-input mt-0 flex-shrink-0">
+            <div>
+              <div class="fw-semibold">{{ cv.role }}</div>
+              <div class="text-muted small">{{ cv.filename }}</div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Job Details -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i class="bi bi-building me-2 text-primary"></i>Job Details
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Company Name</label>
+            <input type="text" class="form-control" name="company" placeholder="e.g. Acme Corp" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Job Title</label>
+            <input type="text" class="form-control" name="job_title" placeholder="e.g. Product Manager" required>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Job Description -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i class="bi bi-file-text me-2 text-primary"></i>Job Description
+      </div>
+      <div class="card-body">
+        <!-- Tab pills -->
+        <ul class="nav nav-pills mb-3" id="jd-tabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="paste-tab" data-bs-toggle="pill"
+                    data-bs-target="#paste-pane" type="button" role="tab">
+              <i class="bi bi-clipboard me-1"></i>Paste text
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="file-tab" data-bs-toggle="pill"
+                    data-bs-target="#file-pane" type="button" role="tab">
+              <i class="bi bi-file-earmark-text me-1"></i>Upload .txt file
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="paste-pane" role="tabpanel">
+            <textarea class="form-control" name="jd_text" id="jd_text" rows="10"
+                      placeholder="Paste the full job description here..."></textarea>
+          </div>
+          <div class="tab-pane fade" id="file-pane" role="tabpanel">
+            <input type="file" class="form-control" name="jd_file" id="jd_file" accept=".txt">
+            <div class="form-text">Upload a plain text (.txt) file containing the job description.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Credit notice -->
+    {% if credits <= 1 %}
+    <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+      <span>
+        {% if credits == 1 %}
+          This is your <strong>last run</strong>.
+          <a href="/pricing" class="alert-link">Buy more runs</a> before you run out.
+        {% else %}
+          You have no runs left. <a href="/pricing" class="alert-link">Buy runs</a> to continue.
+        {% endif %}
+      </span>
+    </div>
+    {% endif %}
+
+    <!-- Submit -->
+    <div class="d-grid">
+      <button type="submit" class="btn btn-primary btn-lg" id="tailor-btn"
+              {% if credits < 1 %}disabled{% endif %}>
+        <i class="bi bi-magic me-2"></i>Tailor My CV
+        <span class="badge bg-white text-primary ms-2" style="font-size:0.7rem;">uses 1 run</span>
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<!-- Results section (hidden until job starts) -->
+<div id="results-section" class="d-none">
+
+  <!-- Spinner -->
+  <div class="card mb-4" id="spinner-card">
+    <div class="card-body text-center py-5">
+      <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+      <h5 class="mb-2">Tailoring your CV...</h5>
+      <p class="text-muted mb-0">
+        Claude is reading the job description and rewriting your bullet points.<br>
+        This usually takes 20–30 seconds.
+      </p>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div class="card mb-4 d-none" id="success-card">
+    <div class="card-header text-success">
+      <i class="bi bi-check-circle-fill me-2"></i>Your CV is ready
+    </div>
+    <div class="card-body">
+      <p class="text-muted mb-3" style="font-size:0.9rem;">
+        <span id="changes-count" class="fw-semibold text-dark"></span> bullet points were rewritten.
+        Download your tailored CV below.
+      </p>
+      <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="#" id="dl-docx" class="btn btn-primary">
+          <i class="bi bi-file-earmark-word me-2"></i>Download .docx
+        </a>
+        <a href="#" id="dl-pdf" class="btn btn-outline-secondary">
+          <i class="bi bi-file-earmark-pdf me-2"></i>Download PDF
+        </a>
+      </div>
+
+      <!-- Changes accordion -->
+      <div id="changes-section" class="d-none">
+        <h6 class="mb-2 fw-semibold">Changes Made</h6>
+        <div class="accordion" id="changes-accordion"></div>
+      </div>
+
+      <!-- Tailor another -->
+      <hr class="my-4">
+      <div class="d-flex gap-3">
+        <button class="btn btn-outline-primary btn-sm" onclick="tailorAnother()">
+          <i class="bi bi-arrow-repeat me-1"></i>Tailor another job
+        </button>
+        <form method="post" action="/reset" class="d-inline">
+          <button type="submit" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Start over
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="card border-danger d-none" id="error-card">
+    <div class="card-body text-center py-4">
+      <i class="bi bi-exclamation-circle-fill text-danger fs-2 mb-2 d-block"></i>
+      <h6 class="text-danger mb-2">Something went wrong</h6>
+      <p class="text-muted small mb-3" id="error-message"></p>
+      <button class="btn btn-outline-danger btn-sm" onclick="tailorAnother()">Try Again</button>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Highlight selected role CV card
+  document.querySelectorAll('input[name="cv_index"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.role-cv-card').forEach(c => c.classList.remove('selected'));
+      radio.closest('.role-cv-card').classList.add('selected');
+    });
+    if (radio.checked) radio.closest('.role-cv-card').classList.add('selected');
+  });
+
+  // ---- Form submission ----
+  document.getElementById('tailor-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('tailor-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+
+    // Show results section with spinner
+    document.getElementById('tailor-form-section').classList.add('d-none');
+    document.getElementById('results-section').classList.remove('d-none');
+    document.getElementById('spinner-card').classList.remove('d-none');
+    document.getElementById('success-card').classList.add('d-none');
+    document.getElementById('error-card').classList.add('d-none');
+
+    const formData = new FormData(this);
+    let resp, data;
+    try {
+      resp = await fetch('/tailor', { method: 'POST', body: formData });
+      data = await resp.json();
+    } catch {
+      showTailorError('Network error. Please try again.');
+      return;
+    }
+
+    if (!resp.ok || data.error) {
+      // If 402, out of credits — redirect to pricing
+      if (resp.status === 402) {
+        window.location.href = '/pricing';
+        return;
+      }
+      showTailorError(data.error || 'Submission failed.');
+      return;
+    }
+
+    // Update credit badge immediately
+    if (typeof data.credits_remaining === 'number') {
+      const badge = document.querySelector('.navbar .badge');
+      if (badge) {
+        const n = data.credits_remaining;
+        badge.innerHTML = `<i class="bi bi-lightning-charge-fill text-warning me-1"></i>${n} run${n !== 1 ? 's' : ''} left`;
+      }
+    }
+
+    const jobId = data.job_id;
+
+    // Poll every 2.5s
+    const poll = setInterval(async () => {
+      try {
+        const sr = await fetch(`/job/${jobId}`);
+        const sdata = await sr.json();
+
+        if (sdata.status === 'done') {
+          clearInterval(poll);
+          showSuccess(jobId, sdata.result);
+        } else if (sdata.status === 'error') {
+          clearInterval(poll);
+          showTailorError(sdata.error || 'Tailoring failed.');
+        }
+      } catch { /* keep polling */ }
+    }, 2500);
+  });
+
+  function showSuccess(jobId, result) {
+    document.getElementById('spinner-card').classList.add('d-none');
+    document.getElementById('success-card').classList.remove('d-none');
+
+    // Download links
+    document.getElementById('dl-docx').href = `/download/${jobId}/docx`;
+    if (result.pdf_available) {
+      document.getElementById('dl-pdf').href = `/download/${jobId}/pdf`;
+      document.getElementById('dl-pdf').classList.remove('d-none');
+    } else {
+      document.getElementById('dl-pdf').classList.add('d-none');
+    }
+
+    document.getElementById('changes-count').textContent =
+      result.applied_count + (result.applied_count === 1 ? ' bullet point was' : ' bullet points were');
+
+    // Render changes accordion
+    const applied = result.applied || [];
+    if (applied.length > 0) {
+      const accordion = document.getElementById('changes-accordion');
+      accordion.innerHTML = applied.map((c, i) => `
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button ${i > 0 ? 'collapsed' : ''} py-2 small" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#change-${i}">
+              <strong>${escHtml(c.new_label || '')}</strong>&nbsp;
+              <span class="text-muted fw-normal text-truncate">${escHtml((c.new_text || '').slice(0, 60))}…</span>
+            </button>
+          </h2>
+          <div id="change-${i}" class="accordion-collapse collapse ${i === 0 ? 'show' : ''}">
+            <div class="accordion-body small">
+              <p class="text-muted mb-1"><strong>Was:</strong> ${escHtml(c.original_text || '')}</p>
+              <p class="mb-1"><strong>Now:</strong> <strong>${escHtml(c.new_label || '')}</strong>${escHtml(c.new_text || '')}</p>
+              ${c.reason ? `<p class="text-muted mb-0"><i class="bi bi-info-circle me-1"></i>${escHtml(c.reason)}</p>` : ''}
+            </div>
+          </div>
+        </div>`).join('');
+      document.getElementById('changes-section').classList.remove('d-none');
+    }
+  }
+
+  function showTailorError(msg) {
+    document.getElementById('spinner-card').classList.add('d-none');
+    document.getElementById('error-message').textContent = msg;
+    document.getElementById('error-card').classList.remove('d-none');
+  }
+
+  function tailorAnother() {
+    document.getElementById('results-section').classList.add('d-none');
+    document.getElementById('spinner-card').classList.remove('d-none');
+    document.getElementById('success-card').classList.add('d-none');
+    document.getElementById('error-card').classList.add('d-none');
+    document.getElementById('tailor-form-section').classList.remove('d-none');
+    const btn = document.getElementById('tailor-btn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-magic me-2"></i>Tailor My CV';
+    // Clear JD textarea
+    document.getElementById('jd_text').value = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+{% endblock %}
