@@ -265,6 +265,11 @@ def register_post():
 
     row = database.get_user_by_id(user_id)
     login_user(User.from_row(row))
+    # Clear any stale CV session state from a previous user's session in this browser.
+    # A brand-new user can never have legitimately generated role CVs yet.
+    # (pending_generation / role_types are preserved — needed if they uploaded CVs before registering)
+    session.pop("role_cvs", None)
+    session.pop("generated_dir", None)
     # New users always go to pricing first (0 credits)
     return redirect(url_for("pricing"))
 
