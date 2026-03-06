@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS users (
     credits       INTEGER NOT NULL DEFAULT 0,
     created_at    DATETIME DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS user_role_cvs (
+    user_id       INTEGER PRIMARY KEY REFERENCES users(id),
+    role_cvs_json TEXT    NOT NULL,
+    generated_dir TEXT    NOT NULL,
+    updated_at    DATETIME DEFAULT (datetime('now'))
+);
 """
 
 
@@ -79,6 +86,34 @@ def add_credits(user_id: int, amount: int):
             "UPDATE users SET credits = credits + ? WHERE id = ?",
             (amount, user_id),
         )
+
+
+def save_role_cvs(user_id: int, role_cvs: list, generated_dir: str):
+    """Persist a user's generated role CVs so they survive across browser sessions."""
+    import json
+    with get_db() as conn:
+        conn.execute(
+            """INSERT INTO user_role_cvs (user_id, role_cvs_json, generated_dir, updated_at)
+               VALUES (?, ?, ?, datetime('now'))
+               ON CONFLICT(user_id) DO UPDATE SET
+                 role_cvs_json = excluded.role_cvs_json,
+                 generated_dir = excluded.generated_dir,
+                 updated_at    = excluded.updated_at""",
+            (user_id, json.dumps(role_cvs), generated_dir),
+        )
+
+
+def get_role_cvs(user_id: int) -> dict | None:
+    """Load a user's persisted role CVs. Returns None if none saved yet."""
+    import json
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT role_cvs_json, generated_dir FROM user_role_cvs WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {"role_cvs": json.loads(row["role_cvs_json"]), "generated_dir": row["generated_dir"]}
 
 
 def deduct_credit(user_id: int) -> int:

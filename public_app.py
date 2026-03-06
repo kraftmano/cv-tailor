@@ -149,6 +149,13 @@ def safe_name(text: str) -> str:
     return re.sub(r"[^\w\-]", "_", text).strip("_")
 
 
+def get_user_generated_dir(user_id: int) -> Path:
+    """Stable, user-specific directory for generated role CVs (survives across sessions)."""
+    d = UPLOAD_BASE / f"user_{user_id}" / "generated"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def credits_required(f):
     """Decorator: redirect to pricing if user has no credits."""
     @wraps(f)
@@ -284,9 +291,14 @@ def login_post():
     # If files were uploaded before login, resume generation
     if session.get("pending_generation"):
         return redirect(url_for("generate_pending"))
-    # If a previous session's role CVs are still available, go straight to tailor
-    if session.get("role_cvs"):
+
+    # Restore role CVs from DB (works across browsers and sessions)
+    saved = database.get_role_cvs(row["id"])
+    if saved:
+        session["role_cvs"] = saved["role_cvs"]
+        session["generated_dir"] = saved["generated_dir"]
         return redirect(url_for("tailor_page"))
+
     return redirect(url_for("index"))
 
 
@@ -426,8 +438,12 @@ def setup():
     session_dir = get_session_dir()
     input_dir = session_dir / "input"
     input_dir.mkdir(exist_ok=True)
-    generated_dir = session_dir / "generated"
-    generated_dir.mkdir(exist_ok=True)
+    # Use stable user-based dir when logged in so files persist across browser sessions
+    if current_user.is_authenticated:
+        generated_dir = get_user_generated_dir(current_user.id)
+    else:
+        generated_dir = session_dir / "generated"
+        generated_dir.mkdir(exist_ok=True)
 
     saved_paths = []
     for f in valid_files:
@@ -475,10 +491,9 @@ def generate_pending():
         return redirect(url_for("pricing"))
 
     role_types = session.get("role_types", [])
-    generated_dir = session.get("generated_dir")
     cv_session_id = session.get("cv_session_id")
 
-    if not role_types or not generated_dir or not cv_session_id:
+    if not role_types or not cv_session_id:
         flash("Upload data expired. Please upload your CVs again.", "warning")
         return redirect(url_for("index"))
 
@@ -489,6 +504,9 @@ def generate_pending():
         flash("Upload data expired. Please upload your CVs again.", "warning")
         return redirect(url_for("index"))
 
+    # Always use the stable user-based dir
+    generated_dir = get_user_generated_dir(current_user.id)
+    session["generated_dir"] = str(generated_dir)
     session.pop("pending_generation", None)
 
     job_id = str(uuid.uuid4())
@@ -497,7 +515,7 @@ def generate_pending():
 
     t = threading.Thread(
         target=_run_generation,
-        args=(job_id, saved_paths, role_types, generated_dir),
+        args=(job_id, saved_paths, role_types, str(generated_dir)),
         daemon=True,
     )
     t.start()
@@ -514,9 +532,12 @@ def setup_status(job_id):
 
     if job["status"] == "done":
         results = job["results"]
-        session["role_cvs"] = [
-            {"role": r["role"], "filename": r["filename"]} for r in results
-        ]
+        role_cvs = [{"role": r["role"], "filename": r["filename"]} for r in results]
+        session["role_cvs"] = role_cvs
+        # Persist to DB so returning users on any browser go straight to tailor
+        if current_user.is_authenticated:
+            generated_dir = session.get("generated_dir", "")
+            database.save_role_cvs(current_user.id, role_cvs, generated_dir)
         return jsonify({"status": "done", "count": len(results)})
 
     return jsonify({"status": job["status"], "error": job.get("error")})
