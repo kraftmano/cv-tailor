@@ -6,7 +6,7 @@ Two-page flow (requires login + credits):
   Page 2 (/tailor): Select a role CV + enter job details → tailors CV to a specific job
 
 Auth: Flask-Login with email/password stored in SQLite
-Payments: Stripe Checkout (€7.99 = 5 runs). Credits deducted per tailoring job.
+Payments: Stripe Checkout (€4.99 = 5 runs). Credits deducted per tailoring job.
 """
 
 import os
@@ -64,7 +64,7 @@ UPLOAD_BASE.mkdir(exist_ok=True)
 ALLOWED_EXTENSIONS = {"docx"}
 
 CREDITS_PER_PACK = 5
-PACK_PRICE_EUROS = 7.99
+PACK_PRICE_EUROS = 4.99
 
 # In-memory job store
 jobs: dict = {}
