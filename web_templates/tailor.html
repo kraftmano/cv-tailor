@@ -37,10 +37,14 @@
             <input type="radio" name="cv_index" value="{{ loop.index0 }}"
                    {% if loop.first %}checked{% endif %}
                    class="form-check-input mt-0 flex-shrink-0">
-            <div>
+            <div class="flex-grow-1">
               <div class="fw-semibold">{{ cv.role }}</div>
-              <div class="text-muted small">{{ cv.filename }}</div>
+              <div class="text-muted small">Role-optimised CV</div>
             </div>
+            <a href="/download-role/{{ loop.index0 }}" class="btn btn-sm btn-outline-secondary ms-auto flex-shrink-0"
+               onclick="event.stopPropagation();" title="Download this role CV">
+              <i class="bi bi-download me-1"></i>Download
+            </a>
           </label>
           {% endfor %}
         </div>

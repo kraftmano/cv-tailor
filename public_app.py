@@ -613,6 +613,30 @@ def job_status(job_id):
 # Download
 # ---------------------------------------------------------------------------
 
+@app.get("/download-role/<int:cv_index>")
+@login_required
+def download_role_cv(cv_index):
+    """Download a generated role CV (template version, before job tailoring)."""
+    role_cvs = session.get("role_cvs", [])
+    generated_dir = session.get("generated_dir")
+
+    if cv_index < 0 or cv_index >= len(role_cvs) or not generated_dir:
+        return "File not found", 404
+
+    cv = role_cvs[cv_index]
+    path = Path(generated_dir) / cv["filename"]
+
+    if not path.exists():
+        return "File not found", 404
+
+    return send_file(
+        str(path),
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        as_attachment=True,
+        download_name=f"CV_{safe_name(cv['role'])}.docx",
+    )
+
+
 @app.get("/download/<job_id>/<filetype>")
 @login_required
 def download(job_id, filetype):
