@@ -16,6 +16,14 @@
   </div>
 </div>
 
+<!-- Returning user banner (shown when not logged in) -->
+{% if not current_user.is_authenticated %}
+<div class="alert alert-light border d-flex align-items-center justify-content-between mb-4 py-3">
+  <span class="text-muted small">Already have an account?</span>
+  <a href="/login" class="btn btn-sm btn-outline-primary">Sign in to continue &rarr;</a>
+</div>
+{% endif %}
+
 <!-- Main form (shown until job starts) -->
 <div id="setup-form-section">
   <form id="setup-form" enctype="multipart/form-data">
@@ -218,21 +226,32 @@
       return;
     }
 
-    // Show processing UI
+    // Need to register first
+    if (data.status === 'need_auth') {
+      window.location.href = data.redirect;
+      return;
+    }
+
+    // Need to pay first
+    if (data.status === 'need_payment') {
+      window.location.href = data.redirect;
+      return;
+    }
+
+    // Ready — show spinner and poll
+    showSpinner(data.job_id, roles.length);
+  });
+
+  function showSpinner(jobId, roleCount) {
     document.getElementById('setup-form-section').classList.add('d-none');
     document.getElementById('processing-section').classList.remove('d-none');
-
-    const jobId = data.job_id;
-    const roleCount = roles.length;
     document.getElementById('generation-progress').textContent =
       `Generating ${roleCount} role CV${roleCount > 1 ? 's' : ''}...`;
 
-    // Poll
     const poll = setInterval(async () => {
       try {
         const sr = await fetch(`/setup-status/${jobId}`);
         const sdata = await sr.json();
-
         if (sdata.status === 'done') {
           clearInterval(poll);
           window.location.href = '/tailor';
@@ -242,7 +261,7 @@
         }
       } catch { /* keep polling */ }
     }, 2500);
-  });
+  }
 
   function showProcessingError(msg) {
     document.getElementById('spinner-card').classList.add('d-none');
@@ -270,5 +289,12 @@
   function escHtml(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+
+  // Auto-start polling if server already started a generation job (post-login/payment redirect)
+  {% if pending_job_id %}
+  document.addEventListener('DOMContentLoaded', function() {
+    showSpinner('{{ pending_job_id }}', {{ role_count | default(1) }});
+  });
+  {% endif %}
 </script>
 {% endblock %}

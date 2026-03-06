@@ -258,6 +258,7 @@ def register_post():
 
     row = database.get_user_by_id(user_id)
     login_user(User.from_row(row))
+    # New users always go to pricing first (0 credits)
     return redirect(url_for("pricing"))
 
 
@@ -279,8 +280,14 @@ def login_post():
         return render_template("login.html")
 
     login_user(User.from_row(row))
-    next_page = request.args.get("next")
-    return redirect(next_page or url_for("index"))
+
+    # If files were uploaded before login, resume generation
+    if session.get("pending_generation"):
+        return redirect(url_for("generate_pending"))
+    # If a previous session's role CVs are still available, go straight to tailor
+    if session.get("role_cvs"):
+        return redirect(url_for("tailor_page"))
+    return redirect(url_for("index"))
 
 
 @app.post("/logout")
@@ -350,6 +357,9 @@ def payment_success():
         f"Payment successful! {CREDITS_PER_PACK} tailoring runs have been added to your account.",
         "success",
     )
+    # If files were uploaded before payment, resume generation now
+    if session.get("pending_generation"):
+        return redirect(url_for("generate_pending"))
     return redirect(url_for("index"))
 
 
@@ -393,19 +403,16 @@ def stripe_webhook():
 # ---------------------------------------------------------------------------
 
 @app.get("/")
-@login_required
 def index():
-    row = database.get_user_by_id(current_user.id)
-    credits = row["credits"] if row else 0
-    if credits < 1:
-        return redirect(url_for("pricing"))
-    return render_template("index.html", credits=credits)
+    # Logged-in users with an active session go straight to tailor
+    if current_user.is_authenticated and session.get("role_cvs"):
+        return redirect(url_for("tailor_page"))
+    return render_template("index.html")
 
 
 @app.post("/setup")
-@login_required
 def setup():
-    """Handle CV uploads + role types. Spawns background generation job."""
+    """Handle CV uploads + role types. Saves files then checks auth/credits."""
     files = request.files.getlist("cv_files")
     role_types_raw = request.form.getlist("role_types")
     role_types = [r.strip() for r in role_types_raw if r.strip()]
@@ -432,6 +439,18 @@ def setup():
     session["role_types"] = role_types
     session["generated_dir"] = str(generated_dir)
 
+    # Not logged in → save state, tell frontend to go register
+    if not current_user.is_authenticated:
+        session["pending_generation"] = True
+        return jsonify({"status": "need_auth", "redirect": url_for("register_get")})
+
+    # Logged in but no credits → save state, send to pricing
+    row = database.get_user_by_id(current_user.id)
+    if not row or row["credits"] < 1:
+        session["pending_generation"] = True
+        return jsonify({"status": "need_payment", "redirect": url_for("pricing")})
+
+    # Ready — start generation immediately
     job_id = str(uuid.uuid4())
     with jobs_lock:
         jobs[job_id] = {"status": "running"}
@@ -443,11 +462,50 @@ def setup():
     )
     t.start()
 
-    return jsonify({"job_id": job_id})
+    return jsonify({"status": "ok", "job_id": job_id})
+
+
+@app.get("/generate")
+@login_required
+def generate_pending():
+    """Resume generation using files uploaded before login/payment."""
+    row = database.get_user_by_id(current_user.id)
+    if not row or row["credits"] < 1:
+        flash("Please purchase runs to continue.", "info")
+        return redirect(url_for("pricing"))
+
+    role_types = session.get("role_types", [])
+    generated_dir = session.get("generated_dir")
+    cv_session_id = session.get("cv_session_id")
+
+    if not role_types or not generated_dir or not cv_session_id:
+        flash("Upload data expired. Please upload your CVs again.", "warning")
+        return redirect(url_for("index"))
+
+    input_dir = UPLOAD_BASE / cv_session_id / "input"
+    saved_paths = sorted([str(p) for p in input_dir.glob("*.docx")]) if input_dir.exists() else []
+
+    if not saved_paths:
+        flash("Upload data expired. Please upload your CVs again.", "warning")
+        return redirect(url_for("index"))
+
+    session.pop("pending_generation", None)
+
+    job_id = str(uuid.uuid4())
+    with jobs_lock:
+        jobs[job_id] = {"status": "running"}
+
+    t = threading.Thread(
+        target=_run_generation,
+        args=(job_id, saved_paths, role_types, generated_dir),
+        daemon=True,
+    )
+    t.start()
+
+    return render_template("index.html", pending_job_id=job_id, role_count=len(role_types))
 
 
 @app.get("/setup-status/<job_id>")
-@login_required
 def setup_status(job_id):
     with jobs_lock:
         job = jobs.get(job_id)
