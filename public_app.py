@@ -552,9 +552,25 @@ def setup_status(job_id):
 # Page 2 routes
 # ---------------------------------------------------------------------------
 
+def _restore_role_cvs_from_db():
+    """Populate session from DB if role_cvs is missing (e.g. session cookie expired).
+    Returns True if role_cvs are now available in session, False otherwise."""
+    if session.get("role_cvs"):
+        return True
+    if not current_user.is_authenticated:
+        return False
+    saved = database.get_role_cvs(current_user.id)
+    if saved:
+        session["role_cvs"] = saved["role_cvs"]
+        session["generated_dir"] = saved["generated_dir"]
+        return True
+    return False
+
+
 @app.get("/tailor")
 @login_required
 def tailor_page():
+    _restore_role_cvs_from_db()
     role_cvs = session.get("role_cvs")
     if not role_cvs:
         flash("Please upload your CVs first.", "warning")
@@ -567,6 +583,7 @@ def tailor_page():
 @app.post("/tailor")
 @login_required
 def tailor_submit():
+    _restore_role_cvs_from_db()
     role_cvs = session.get("role_cvs")
     generated_dir = session.get("generated_dir")
 
@@ -643,6 +660,7 @@ def job_status(job_id):
 @login_required
 def download_role_cv(cv_index):
     """Download a generated role CV (template version, before job tailoring)."""
+    _restore_role_cvs_from_db()
     role_cvs = session.get("role_cvs", [])
     generated_dir = session.get("generated_dir")
 
