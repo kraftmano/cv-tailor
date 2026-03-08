@@ -40,11 +40,10 @@
         </p>
 
         <div class="file-drop-zone" id="drop-zone" onclick="document.getElementById('cv_files').click()">
-          <input type="file" id="cv_files" name="cv_files" multiple accept=".docx,.pdf">
+          <input type="file" id="cv_files" name="cv_files" multiple accept=".docx">
           <i class="bi bi-cloud-arrow-up fs-2 text-muted mb-2 d-block"></i>
           <div class="fw-semibold mb-1">Click to upload or drag & drop</div>
-          <div class="text-muted small">.docx or .pdf</div>
-          <div class="text-muted" style="font-size:0.75rem;">Word (.docx) recommended for best output formatting</div>
+          <div class="text-muted small">.docx files only</div>
         </div>
 
         <div id="file-list" class="mt-3"></div>
@@ -198,7 +197,7 @@
     const btn = document.getElementById('generate-btn');
 
     // Validate
-    const files = Array.from(fileInput.files).filter(f => f.name.endsWith('.docx') || f.name.endsWith('.pdf'));
+    const files = Array.from(fileInput.files).filter(f => f.name.endsWith('.docx'));
     const roles = Array.from(document.querySelectorAll('input[name="role_types"]'))
                        .map(i => i.value.trim()).filter(Boolean);
 

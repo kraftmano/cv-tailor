@@ -5,55 +5,27 @@ and saves the result as .docx and PDF.
 """
 
 import json
-import platform
+import os
 import shutil
-import subprocess
 from pathlib import Path
 
 import anthropic
 import docx
-import pdfplumber
+from docx2pdf import convert
 
 
-def extract_pdf_paragraphs(pdf_path: str) -> list[dict]:
-    """Extract text lines from a PDF CV as paragraph dicts."""
-    paragraphs = []
-    idx = 0
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if not text:
-                continue
-            for line in text.split("\n"):
-                line = line.strip()
-                if line:
-                    paragraphs.append({"index": idx, "text": line, "style": "Normal"})
-                    idx += 1
-    return paragraphs
-
-
-def extract_cv_paragraphs(path: str) -> list[dict]:
+def extract_cv_paragraphs(docx_path: str) -> list[dict]:
     """
-    Extract all paragraphs from a CV file (.docx or .pdf).
-    Returns list of dicts with index, text, and style.
+    Extract all paragraphs from the CV with their index and text.
+    Only returns paragraphs that have meaningful text (non-empty, non-header style).
     """
-    if path.lower().endswith(".pdf"):
-        return extract_pdf_paragraphs(path)
-    doc = docx.Document(path)
+    doc = docx.Document(docx_path)
     paragraphs = []
     for i, para in enumerate(doc.paragraphs):
         text = para.text.strip()
         if text:
             paragraphs.append({"index": i, "text": text, "style": para.style.name})
     return paragraphs
-
-
-def create_docx_from_text(paragraphs: list[dict], docx_output_path: str):
-    """Create a plain DOCX from extracted text paragraphs (used when user uploads PDF only)."""
-    doc = docx.Document()
-    for p in paragraphs:
-        doc.add_paragraph(p["text"])
-    doc.save(docx_output_path)
 
 
 def build_prompt(jd_text: str, paragraphs: list[dict]) -> str:
@@ -229,20 +201,8 @@ def apply_suggestions(
 
 
 def generate_pdf(docx_path: str, pdf_path: str):
-    """Convert .docx to PDF. Uses docx2pdf on Windows, LibreOffice on Linux."""
-    if platform.system() == "Windows":
-        from docx2pdf import convert
-        convert(docx_path, pdf_path)
-    else:
-        out_dir = str(Path(pdf_path).parent)
-        subprocess.run(
-            ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", out_dir, docx_path],
-            check=True, capture_output=True, timeout=60,
-        )
-        # LibreOffice names the output after the input stem; rename if needed
-        generated = Path(out_dir) / (Path(docx_path).stem + ".pdf")
-        if generated != Path(pdf_path):
-            generated.rename(pdf_path)
+    """Convert .docx to PDF using docx2pdf (requires Word on Windows)."""
+    convert(docx_path, pdf_path)
 
 
 def tailor_cv(

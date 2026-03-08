@@ -61,7 +61,7 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB
 UPLOAD_BASE = Path(__file__).parent / "uploads"
 UPLOAD_BASE.mkdir(exist_ok=True)
 
-ALLOWED_EXTENSIONS = {"docx", "pdf"}
+ALLOWED_EXTENSIONS = {"docx"}
 
 CREDITS_PER_PACK = 5
 PACK_PRICE_EUROS = 4.99
@@ -436,7 +436,7 @@ def setup():
 
     valid_files = [f for f in files if f and f.filename and allowed_file(f.filename)]
     if not valid_files:
-        return jsonify({"error": "Please upload at least one .docx or .pdf CV file."}), 400
+        return jsonify({"error": "Please upload at least one .docx CV file."}), 400
     if not role_types:
         return jsonify({"error": "Please enter at least one role type."}), 400
 

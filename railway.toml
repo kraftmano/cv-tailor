@@ -1,9 +1,9 @@
 [build]
-builder = "DOCKERFILE"
+builder = "NIXPACKS"
 
 [deploy]
 startCommand = "gunicorn public_app:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 120"
 healthcheckPath = "/login"
-healthcheckTimeout = 120
+healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
