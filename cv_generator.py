@@ -8,14 +8,12 @@ all uploaded CV content for inspiration.
 """
 
 import json
-import os
 import re
-import shutil
 from pathlib import Path
 
 import anthropic
 
-from cv_tailor import apply_suggestions, extract_cv_paragraphs
+from cv_tailor import apply_suggestions, create_docx_from_text, extract_cv_paragraphs
 
 
 def build_role_prompt(role_type: str, template_paragraphs: list[dict], extra_paragraphs: list[dict]) -> str:
@@ -131,15 +129,29 @@ def generate_role_cv(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    template_path = input_cv_paths[0]
     output_path = str(output_dir / f"role_{safe_filename(role_type)}.docx")
+
+    # Prefer DOCX as template (preserves formatting); fall back to building one from first PDF
+    docx_paths = [p for p in input_cv_paths if p.lower().endswith(".docx")]
+    pdf_paths  = [p for p in input_cv_paths if p.lower().endswith(".pdf")]
+
+    if docx_paths:
+        template_path = docx_paths[0]
+        other_paths   = docx_paths[1:] + pdf_paths
+    else:
+        # PDF-only: build a plain DOCX from the first PDF to act as template
+        tmp_docx = str(output_dir / "_template_from_pdf.docx")
+        first_pdf_paragraphs = extract_cv_paragraphs(pdf_paths[0])
+        create_docx_from_text(first_pdf_paragraphs, tmp_docx)
+        template_path = tmp_docx
+        other_paths   = pdf_paths[1:]
 
     # Extract paragraphs from the template CV
     template_paragraphs = extract_cv_paragraphs(template_path)
 
     # Extract paragraphs from all additional CVs (for content inspiration)
     extra_paragraphs = []
-    for path in input_cv_paths[1:]:
+    for path in other_paths:
         try:
             paras = extract_cv_paragraphs(path)
             extra_paragraphs.extend(paras)
