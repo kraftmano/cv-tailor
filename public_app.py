@@ -760,6 +760,9 @@ def reset():
     # Clear only CV-related session keys, keep login session
     for key in ("cv_session_id", "role_types", "generated_dir", "role_cvs"):
         session.pop(key, None)
+    # Also clear DB so _restore_role_cvs_from_db doesn't repopulate session
+    if current_user.is_authenticated:
+        database.clear_role_cvs(current_user.id)
     return redirect(url_for("index"))
 
 

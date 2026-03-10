@@ -124,6 +124,13 @@ def get_role_cvs(user_id: int) -> dict | None:
     return {"role_cvs": json.loads(row["role_cvs_json"]), "generated_dir": row["generated_dir"]}
 
 
+def clear_role_cvs(user_id: int):
+    """Remove all stored role CV metadata and file blobs for a user (e.g. on reset)."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM user_role_cvs WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM user_role_cv_files WHERE user_id = ?", (user_id,))
+
+
 def save_role_cv_file(user_id: int, filename: str, content: bytes):
     """Store a generated role CV DOCX as a blob so it survives server restarts."""
     with get_db() as conn:
