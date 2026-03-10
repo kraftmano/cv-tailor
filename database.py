@@ -30,6 +30,14 @@ CREATE TABLE IF NOT EXISTS user_role_cvs (
     generated_dir TEXT    NOT NULL,
     updated_at    DATETIME DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS user_role_cv_files (
+    user_id       INTEGER NOT NULL REFERENCES users(id),
+    filename      TEXT    NOT NULL,
+    content       BLOB    NOT NULL,
+    updated_at    DATETIME DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, filename)
+);
 """
 
 
@@ -114,6 +122,29 @@ def get_role_cvs(user_id: int) -> dict | None:
     if not row:
         return None
     return {"role_cvs": json.loads(row["role_cvs_json"]), "generated_dir": row["generated_dir"]}
+
+
+def save_role_cv_file(user_id: int, filename: str, content: bytes):
+    """Store a generated role CV DOCX as a blob so it survives server restarts."""
+    with get_db() as conn:
+        conn.execute(
+            """INSERT INTO user_role_cv_files (user_id, filename, content, updated_at)
+               VALUES (?, ?, ?, datetime('now'))
+               ON CONFLICT(user_id, filename) DO UPDATE SET
+                 content    = excluded.content,
+                 updated_at = excluded.updated_at""",
+            (user_id, filename, content),
+        )
+
+
+def get_role_cv_files(user_id: int) -> list[dict]:
+    """Return all stored role CV blobs for a user as [{filename, content}]."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT filename, content FROM user_role_cv_files WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+    return [{"filename": row["filename"], "content": bytes(row["content"])} for row in rows]
 
 
 def deduct_credit(user_id: int) -> int:

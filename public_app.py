@@ -543,6 +543,13 @@ def setup_status(job_id):
         if current_user.is_authenticated:
             generated_dir = session.get("generated_dir", "")
             database.save_role_cvs(current_user.id, role_cvs, generated_dir)
+            # Also store each DOCX as a blob so files survive server restarts
+            for r in results:
+                file_path = Path(generated_dir) / r["filename"]
+                if file_path.exists():
+                    database.save_role_cv_file(
+                        current_user.id, r["filename"], file_path.read_bytes()
+                    )
         return jsonify({"status": "done", "count": len(results)})
 
     return jsonify({"status": job["status"], "error": job.get("error")})
@@ -567,6 +574,28 @@ def _restore_role_cvs_from_db():
     return False
 
 
+def _ensure_role_cv_files_on_disk():
+    """Restore any missing role CV DOCX files from DB blobs (handles server restarts).
+    Called before any operation that reads role CV files from disk."""
+    if not current_user.is_authenticated:
+        return
+    generated_dir = session.get("generated_dir")
+    role_cvs = session.get("role_cvs")
+    if not generated_dir or not role_cvs:
+        return
+    generated_path = Path(generated_dir)
+    missing = [cv["filename"] for cv in role_cvs
+               if not (generated_path / cv["filename"]).exists()]
+    if not missing:
+        return
+    generated_path.mkdir(parents=True, exist_ok=True)
+    blobs = database.get_role_cv_files(current_user.id)
+    blob_map = {b["filename"]: b["content"] for b in blobs}
+    for filename in missing:
+        if filename in blob_map:
+            (generated_path / filename).write_bytes(blob_map[filename])
+
+
 @app.get("/tailor")
 @login_required
 def tailor_page():
@@ -584,6 +613,7 @@ def tailor_page():
 @login_required
 def tailor_submit():
     _restore_role_cvs_from_db()
+    _ensure_role_cv_files_on_disk()
     role_cvs = session.get("role_cvs")
     generated_dir = session.get("generated_dir")
 
@@ -661,6 +691,7 @@ def job_status(job_id):
 def download_role_cv(cv_index):
     """Download a generated role CV (template version, before job tailoring)."""
     _restore_role_cvs_from_db()
+    _ensure_role_cv_files_on_disk()
     role_cvs = session.get("role_cvs", [])
     generated_dir = session.get("generated_dir")
 
