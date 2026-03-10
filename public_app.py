@@ -749,7 +749,7 @@ def download(job_id, filetype):
 # Reset
 # ---------------------------------------------------------------------------
 
-@app.post("/reset")
+@app.route("/reset", methods=["GET", "POST"])
 @login_required
 def reset():
     cv_session_id = session.get("cv_session_id")
