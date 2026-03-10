@@ -198,9 +198,16 @@
   <div class="card border-danger d-none" id="error-card">
     <div class="card-body text-center py-4">
       <i class="bi bi-exclamation-circle-fill text-danger fs-2 mb-2 d-block"></i>
-      <h6 class="text-danger mb-2">Something went wrong</h6>
+      <h6 class="text-danger mb-2" id="error-title">Something went wrong</h6>
       <p class="text-muted small mb-3" id="error-message"></p>
-      <button class="btn btn-outline-danger btn-sm" onclick="tailorAnother()">Try Again</button>
+      <div class="d-flex gap-2 justify-content-center flex-wrap">
+        <button class="btn btn-outline-danger btn-sm d-none" id="try-again-btn" onclick="tailorAnother()">
+          <i class="bi bi-arrow-repeat me-1"></i>Try Again
+        </button>
+        <a href="/reset" class="btn btn-primary btn-sm d-none" id="reupload-btn">
+          <i class="bi bi-upload me-1"></i>Re-upload My CVs
+        </a>
+      </div>
     </div>
   </div>
 
@@ -324,7 +331,14 @@
 
   function showTailorError(msg) {
     document.getElementById('spinner-card').classList.add('d-none');
-    document.getElementById('error-message').textContent = msg;
+    const isFileNotFound = msg && msg.toLowerCase().includes('file not found');
+    document.getElementById('error-title').textContent = isFileNotFound
+      ? 'CV files not found' : 'Something went wrong';
+    document.getElementById('error-message').textContent = isFileNotFound
+      ? 'Your CV files were lost when the server was last updated. Please re-upload your CVs — this is a one-time fix and your credits are not affected.'
+      : msg;
+    document.getElementById('try-again-btn').classList.toggle('d-none', isFileNotFound);
+    document.getElementById('reupload-btn').classList.toggle('d-none', !isFileNotFound);
     document.getElementById('error-card').classList.remove('d-none');
   }
 
